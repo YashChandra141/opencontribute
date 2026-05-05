@@ -9,6 +9,7 @@ export function Navbar() {
   const navLinks = [
     { href: '/', label: 'Home' },
     { href: '/explore', label: 'Explore' },
+    { href: '/bounties', label: 'Bounties' },
     { href: '/companies', label: 'Companies' },
     { href: '/bookmarks', label: 'Bookmarks' },
   ];

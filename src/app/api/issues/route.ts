@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/db';
 import { issues, repositories, companies } from '@/db/schema';
 import { eq, desc, asc, sql } from 'drizzle-orm';
+import { fallbackIssues } from '@/lib/fallback-data';
+import { buildYcIssues } from '@/lib/yc-api';
 
 // GET /api/issues - Get issues with filtering and pagination
 export async function GET(request: NextRequest) {
@@ -131,9 +133,65 @@ export async function GET(request: NextRequest) {
     
   } catch (error) {
     console.error('Error fetching issues:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch issues', details: String(error) },
-      { status: 500 }
-    );
+    const { searchParams } = new URL(request.url);
+    const domain = searchParams.get('domain');
+    const language = searchParams.get('language');
+    const companyId = searchParams.get('company');
+    const search = (searchParams.get('search') || '').toLowerCase();
+    const sort = searchParams.get('sort') || 'newest';
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+
+    let filtered = [...fallbackIssues];
+    try {
+      filtered = await buildYcIssues(Math.max(limit, 24));
+    } catch (ycError) {
+      console.error('YC issues generation failed:', ycError);
+    }
+
+    if (domain) {
+      filtered = filtered.filter((issue) => issue.company.domain === domain);
+    }
+
+    if (language) {
+      filtered = filtered.filter((issue) => issue.repository.language === language);
+    }
+
+    if (companyId) {
+      const companyNumericId = parseInt(companyId);
+      if (!Number.isNaN(companyNumericId)) {
+        filtered = filtered.filter((issue) => issue.company.id === companyNumericId);
+      }
+    }
+
+    if (search) {
+      filtered = filtered.filter((issue) =>
+        `${issue.title} ${issue.body} ${issue.company.name}`.toLowerCase().includes(search)
+      );
+    }
+
+    if (sort === 'oldest') {
+      filtered.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    } else if (sort === 'popular') {
+      filtered.sort((a, b) => b.commentsCount - a.commentsCount);
+    } else {
+      filtered.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    }
+
+    const total = filtered.length;
+    const offset = (page - 1) * limit;
+    const paged = filtered.slice(offset, offset + limit);
+
+    return NextResponse.json({
+      issues: paged,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.max(1, Math.ceil(total / limit)),
+      },
+      degraded: true,
+      message: 'Database unavailable. Serving fallback issues.',
+    });
   }
 }

@@ -1,5 +1,5 @@
-// Discovery Engine: OSSInsight + GitHub Search
-// Finds under-the-radar startups in AI, DevTools, DevOps, Fullstack, Web3
+// Discovery Engine: GitHub YC-focused discovery
+// Finds YC startups/companies with active open-source repos
 
 import { Octokit } from '@octokit/rest';
 
@@ -11,40 +11,11 @@ const OSSINSIGHT_URL = process.env.OSSINSIGHT_BASE_URL || 'https://api.ossinsigh
 
 // Priority domains with their OSSInsight collection IDs
 const DOMAIN_COLLECTIONS: Record<string, number[]> = {
-  AI: [10010, 10076, 10098, 10106, 10112], // AI, LLM Tools, AI Agent Frameworks, Coding Agents, AI Coding Assistants
-  DevTools: [10087, 10047, 10015, 10064], // LLM DevTools, Terminal, Text Editor, JS Build Tool
-  DevOps: [10020, 10054, 10053, 10063], // CI/CD, Monitoring, Config Management, K8s Tooling
-  Fullstack: [10004, 10005, 10019, 10090], // Web Framework, JS Framework, React Framework, Go Web Frameworks
-  Web3: [10031], // Web3
-};
-
-// GitHub search queries for each domain
-const GITHUB_SEARCHES: Record<string, string[]> = {
-  AI: [
-    'topic:artificial-intelligence stars:500..20000 pushed:>2024-01-01',
-    'topic:machine-learning stars:500..20000 pushed:>2024-01-01',
-    'topic:llm stars:500..20000 pushed:>2024-01-01',
-  ],
-  DevTools: [
-    'topic:developer-tools stars:500..20000 pushed:>2024-01-01',
-    'topic:devtools stars:500..20000 pushed:>2024-01-01',
-    'topic:cli stars:500..20000 pushed:>2024-01-01',
-  ],
-  DevOps: [
-    'topic:devops stars:500..20000 pushed:>2024-01-01',
-    'topic:ci-cd stars:500..20000 pushed:>2024-01-01',
-    'topic:infrastructure stars:500..20000 pushed:>2024-01-01',
-  ],
-  Fullstack: [
-    'topic:fullstack stars:500..20000 pushed:>2024-01-01',
-    'topic:web-framework stars:500..20000 pushed:>2024-01-01',
-    'topic:backend stars:500..20000 pushed:>2024-01-01',
-  ],
-  Web3: [
-    'topic:web3 stars:500..20000 pushed:>2024-01-01',
-    'topic:blockchain stars:500..20000 pushed:>2024-01-01',
-    'topic:defi stars:500..20000 pushed:>2024-01-01',
-  ],
+  AI: [10010, 10076, 10098, 10106, 10112],
+  DevTools: [10087, 10047, 10015, 10064],
+  DevOps: [10020, 10054, 10053, 10063],
+  Fullstack: [10004, 10005, 10019, 10090],
+  Web3: [10031],
 };
 
 interface DiscoveredRepo {
@@ -53,7 +24,7 @@ interface DiscoveredRepo {
   description: string | null;
   website: string | null;
   domain: string;
-  discoverySource: 'OSSInsight' | 'GitHubSearch';
+  discoverySource: 'YCGitHub' | 'OSSInsight';
   stars: number;
   forks: number;
   fullName: string;
@@ -62,31 +33,41 @@ interface DiscoveredRepo {
   repoId: number;
 }
 
+function classifyDomain(topics: string[], language: string | null): string {
+  const tags = topics.map((topic) => topic.toLowerCase());
+  const lang = (language || '').toLowerCase();
+
+  if (tags.some((tag) => ['ai', 'llm', 'machine-learning', 'ml', 'gpt'].includes(tag))) return 'AI';
+  if (tags.some((tag) => ['devops', 'kubernetes', 'observability', 'ci-cd', 'infrastructure'].includes(tag))) return 'DevOps';
+  if (tags.some((tag) => ['web3', 'blockchain', 'crypto', 'defi'].includes(tag))) return 'Web3';
+  if (tags.some((tag) => ['developer-tools', 'devtools', 'cli', 'tooling'].includes(tag))) return 'DevTools';
+  if (['typescript', 'javascript', 'python', 'go', 'rust'].includes(lang)) return 'Fullstack';
+  return 'DevTools';
+}
+
 // Fetch from OSSInsight collections
 async function fetchFromOSSInsight(): Promise<DiscoveredRepo[]> {
   const repos: DiscoveredRepo[] = [];
-  
+
   for (const [domain, collectionIds] of Object.entries(DOMAIN_COLLECTIONS)) {
     for (const collectionId of collectionIds) {
       try {
-        // Get collection items
         const response = await fetch(`${OSSINSIGHT_URL}/collections/${collectionId}/repos`);
         if (!response.ok) continue;
-        
+
         const data = await response.json();
         if (!data.data?.rows) continue;
-        
+
         for (const row of data.data.rows) {
-          // Filter: under 20k stars, over 500 stars
           const stars = parseInt(row.stars) || 0;
-          if (stars < 500 || stars > 20000) continue;
-          
+          if (stars < 150 || stars > 100000) continue;
+
           const [owner, repo] = row.repo_name.split('/');
           if (!owner || !repo) continue;
-          
+
           repos.push({
             githubOrg: owner,
-            name: owner, // Company/org name
+            name: owner,
             description: row.description || null,
             website: null,
             domain,
@@ -95,7 +76,7 @@ async function fetchFromOSSInsight(): Promise<DiscoveredRepo[]> {
             forks: parseInt(row.forks) || 0,
             fullName: row.repo_name,
             language: row.primary_language || null,
-            openIssuesCount: 0, // Will be fetched via GitHub API
+            openIssuesCount: 0,
             repoId: parseInt(row.repo_id) || 0,
           });
         }
@@ -104,54 +85,53 @@ async function fetchFromOSSInsight(): Promise<DiscoveredRepo[]> {
       }
     }
   }
-  
+
   return repos;
 }
 
-// Fetch from GitHub Search API
-async function fetchFromGitHubSearch(): Promise<DiscoveredRepo[]> {
+// Fetch YC-tagged or YC-described repositories from GitHub
+async function fetchFromYcGitHub(): Promise<DiscoveredRepo[]> {
   const repos: DiscoveredRepo[] = [];
-  
-  for (const [domain, queries] of Object.entries(GITHUB_SEARCHES)) {
-    for (const query of queries) {
-      try {
-        // Search repos
-        const response = await octokit.rest.search.repos({
-          q: query,
-          sort: 'updated',
-          order: 'desc',
-          per_page: 30,
+  const ycQueries = [
+    'topic:y-combinator topic:open-source stars:150..100000 pushed:>2024-01-01 archived:false',
+    'ycombinator in:description topic:open-source stars:150..100000 pushed:>2024-01-01 archived:false',
+    'topic:y-combinator stars:150..100000 pushed:>2024-01-01 archived:false',
+  ];
+
+  for (const query of ycQueries) {
+    try {
+      const response = await octokit.rest.search.repos({
+        q: query,
+        sort: 'updated',
+        order: 'desc',
+        per_page: 30,
+      });
+
+      for (const repo of response.data.items || []) {
+        if (repo.stargazers_count < 150) continue;
+        const [owner] = repo.full_name.split('/');
+        const topics = repo.topics || [];
+
+        repos.push({
+          githubOrg: owner,
+          name: owner,
+          description: repo.description,
+          website: repo.homepage,
+          domain: classifyDomain(topics, repo.language),
+          discoverySource: 'YCGitHub',
+          stars: repo.stargazers_count,
+          forks: repo.forks_count,
+          fullName: repo.full_name,
+          language: repo.language,
+          openIssuesCount: repo.open_issues_count,
+          repoId: repo.id,
         });
-        
-        for (const repo of response.data.items || []) {
-          // Filter out mega-popular repos
-          if (repo.stargazers_count > 20000) continue;
-          if (repo.stargazers_count < 500) continue;
-          
-          // Get org from repo full_name
-          const [owner] = repo.full_name.split('/');
-          
-          repos.push({
-            githubOrg: owner,
-            name: owner,
-            description: repo.description,
-            website: repo.homepage,
-            domain,
-            discoverySource: 'GitHubSearch',
-            stars: repo.stargazers_count,
-            forks: repo.forks_count,
-            fullName: repo.full_name,
-            language: repo.language,
-            openIssuesCount: repo.open_issues_count,
-            repoId: repo.id,
-          });
-        }
-      } catch (error) {
-        console.error(`GitHub search error for ${domain}:`, error);
       }
+    } catch (error) {
+      console.error('YC GitHub search error:', error);
     }
   }
-  
+
   return repos;
 }
 
@@ -162,10 +142,7 @@ function deduplicateRepos(repos: DiscoveredRepo[]): DiscoveredRepo[] {
   for (const repo of repos) {
     const existing = seen.get(repo.githubOrg);
     
-    // Keep the one with higher stars or OSSInsight over GitHubSearch
-    if (!existing || 
-        repo.stars > existing.stars || 
-        (repo.stars === existing.stars && repo.discoverySource === 'OSSInsight')) {
+    if (!existing || repo.stars > existing.stars) {
       seen.set(repo.githubOrg, repo);
     }
   }
@@ -177,18 +154,12 @@ function deduplicateRepos(repos: DiscoveredRepo[]): DiscoveredRepo[] {
 export async function discoverStartups(limit: number = 50): Promise<DiscoveredRepo[]> {
   console.log('Starting discovery...');
   
-  // Fetch from both sources
-  const [ossInsightRepos, gitHubRepos] = await Promise.all([
-    fetchFromOSSInsight(),
-    fetchFromGitHubSearch(),
-  ]);
+  const [ycRepos, ossInsightRepos] = await Promise.all([fetchFromYcGitHub(), fetchFromOSSInsight()]);
   
+  console.log(`YC GitHub: ${ycRepos.length} repos`);
   console.log(`OSSInsight: ${ossInsightRepos.length} repos`);
-  console.log(`GitHub Search: ${gitHubRepos.length} repos`);
   
-  // Combine and deduplicate
-  const allRepos = [...ossInsightRepos, ...gitHubRepos];
-  const uniqueRepos = deduplicateRepos(allRepos);
+  const uniqueRepos = deduplicateRepos([...ycRepos, ...ossInsightRepos]);
   
   // Sort by stars (descending) and take top N
   const sortedRepos = uniqueRepos

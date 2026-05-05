@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { formatNumber } from '@/lib/format';
 
 interface Issue {
   id: number;
@@ -87,22 +88,22 @@ export function IssueCard({ issue }: IssueCardProps) {
   };
 
   return (
-    <article className="group rounded-xl border border-white/10 bg-zinc-950/85 p-5 shadow-2xl shadow-black/20 transition hover:-translate-y-0.5 hover:border-white/25 hover:bg-zinc-900">
+    <article className="group border-2 border-black bg-[#f8f9fb] p-5 shadow-[4px_4px_0_#000] transition hover:translate-x-px hover:translate-y-px hover:shadow-[2px_2px_0_#000]">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${domainColors[issue.company.domain] || 'border-white/10 bg-white/5 text-gray-300'}`}>
+          <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${domainColors[issue.company.domain] || 'border-black bg-white text-black'}`}>
             {issue.company.domain}
           </span>
-          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-gray-300">
-            {issue.repository.stars.toLocaleString()} stars
+          <span className="rounded-full border border-black bg-white px-2.5 py-1 text-xs text-black">
+            {formatNumber(issue.repository.stars)} stars
           </span>
         </div>
         <button
           onClick={toggleBookmark}
           className={`rounded-lg border px-2.5 py-1 text-sm transition ${
             isBookmarked
-              ? 'border-white bg-white text-black'
-              : 'border-white/10 text-gray-400 hover:border-white/30 hover:text-white'
+              ? 'border-black bg-black text-white'
+              : 'border-black text-neutral-600 hover:bg-neutral-100 hover:text-black'
           }`}
           title={isBookmarked ? 'Remove bookmark' : 'Bookmark this issue'}
         >
@@ -114,14 +115,14 @@ export function IssueCard({ issue }: IssueCardProps) {
         href={issue.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="mb-3 block line-clamp-2 text-lg font-semibold leading-snug text-white transition hover:text-gray-300"
+        className="mb-3 block line-clamp-2 text-lg font-semibold leading-snug text-black transition hover:underline"
       >
         {issue.title}
       </a>
 
-      <div className="mb-4 flex items-center text-sm text-gray-400">
-        <span className="font-medium text-gray-200">{issue.company.name}</span>
-        <span className="mx-2 text-gray-600">/</span>
+      <div className="mb-4 flex items-center text-sm text-neutral-600">
+        <span className="font-medium text-black">{issue.company.name}</span>
+        <span className="mx-2 text-neutral-400">/</span>
         <span>{issue.repository.name}</span>
       </div>
 
@@ -133,25 +134,25 @@ export function IssueCard({ issue }: IssueCardProps) {
             </span>
           ))}
           {issue.labels.length > 3 && (
-            <span className="px-1 text-xs text-gray-500">+{issue.labels.length - 3}</span>
+            <span className="px-1 text-xs text-neutral-500">+{issue.labels.length - 3}</span>
           )}
         </div>
       )}
 
       {issue.repository.language && (
-        <div className="mb-4 flex items-center text-xs font-medium text-gray-300">
-          <span className="mr-2 h-2 w-2 rounded-full bg-white"></span>
+        <div className="mb-4 flex items-center text-xs font-medium text-neutral-700">
+          <span className="mr-2 h-2 w-2 rounded-full bg-black"></span>
           {issue.repository.language}
         </div>
       )}
 
-      <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-4 text-xs text-gray-500">
+      <div className="flex items-center justify-between gap-4 border-t-2 border-black pt-4 text-xs text-neutral-500">
         <div className="min-w-0">
-          <span className="text-gray-300">#{issue.number}</span>
+          <span className="text-black">#{issue.number}</span>
           <span className="mx-2">by</span>
           <span className="truncate">{issue.author}</span>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3">
           <span>{formatDate(issue.createdAt)}</span>
           {issue.commentsCount > 0 && <span>{issue.commentsCount} comments</span>}
         </div>

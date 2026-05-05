@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { IssueCard } from '@/components/IssueCard';
-import { Navbar } from '@/components/Navbar';
+import { AppShell } from '@/components/AppShell';
+import { formatNumber } from '@/lib/format';
 
 interface Issue {
   id: number;
@@ -27,6 +28,28 @@ interface Issue {
   };
 }
 
+interface Company {
+  id: number;
+  name: string;
+  githubOrg: string;
+  description: string;
+  website: string;
+  domain: string;
+  discoverySource: string;
+  stars: number;
+  repoCount: number;
+  totalIssues: number;
+}
+
+interface Bounty {
+  id: string;
+  title: string;
+  repo: string;
+  stack: string[];
+  expiresIn: string;
+  reward: string;
+}
+
 async function getFeaturedIssues() {
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/issues?limit=6&sort=popular`, {
@@ -39,8 +62,52 @@ async function getFeaturedIssues() {
   }
 }
 
+async function getFeaturedCompanies() {
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}/api/companies?limit=4&sort=stars`,
+      { cache: 'no-store' }
+    );
+    if (!res.ok) return { companies: [] };
+    return res.json();
+  } catch {
+    return { companies: [] };
+  }
+}
+
 export default async function HomePage() {
   const { issues } = await getFeaturedIssues();
+  const { companies } = await getFeaturedCompanies();
+  const ycCompanies: Company[] =
+    companies.filter((company: Company) => company.discoverySource === 'YCGitHub').length > 0
+      ? companies.filter((company: Company) => company.discoverySource === 'YCGitHub')
+      : companies;
+  const bounties: Bounty[] = [
+    {
+      id: '#4592',
+      title: 'Implement parallel processing for data ingestion pipeline',
+      repo: 'open-telemetry/opentelemetry-collector',
+      stack: ['Go', 'Docker'],
+      expiresIn: '12h',
+      reward: '$1,200',
+    },
+    {
+      id: '#8921',
+      title: 'Fix memory leak in WebSocket connection handler',
+      repo: 'vercel/next.js',
+      stack: ['TypeScript', 'React'],
+      expiresIn: '3d',
+      reward: '$850',
+    },
+    {
+      id: '#1103',
+      title: 'Create comprehensive benchmark suite for crypto primitives',
+      repo: 'rust-lang/rust',
+      stack: ['Rust'],
+      expiresIn: '14d',
+      reward: '$500',
+    },
+  ];
 
   const domains = [
     { name: 'AI', marker: '01', description: 'Agent frameworks, LLM tools, ML platforms' },
@@ -51,140 +118,86 @@ export default async function HomePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <Navbar />
+    <AppShell searchPlaceholder="Search projects...">
+      <div className="mx-auto flex max-w-7xl flex-col gap-8">
+        <section className="border-2 border-black bg-white p-6 shadow-[8px_8px_0_#000]">
+          <p className="mb-3 inline-block border-2 border-black bg-black px-2 py-1 text-xs font-bold uppercase tracking-wider text-white">
+            Trending Today
+          </p>
+          <h1 className="mb-3 text-5xl font-bold leading-tight tracking-tight">Next.js Framework</h1>
+          <p className="max-w-3xl text-sm font-medium text-neutral-700">
+            Discover under-the-radar open-source startups and contribute to active repositories with high-signal issues.
+          </p>
+        </section>
 
-      <section className="border-b border-white/10 px-4 py-20 md:py-24">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-8 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-sm text-gray-300">
-            Curated open-source issues from high-signal startups
-          </div>
-          <div className="grid items-end gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-            <div>
-              <h1 className="max-w-4xl text-5xl font-bold leading-tight tracking-tight text-white md:text-7xl">
-                Discover under-the-radar open source startups.
-              </h1>
-              <p className="mt-6 max-w-2xl text-lg leading-8 text-gray-400 md:text-xl">
-                Find meaningful contribution opportunities in active startup projects. Skip saturated repos and focus on issues worth your time.
-              </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/explore"
-                  className="rounded-lg bg-white px-6 py-3 text-center font-semibold text-black transition hover:bg-gray-200"
-                >
-                  Explore Issues
-                </Link>
-                <Link
-                  href="/companies"
-                  className="rounded-lg border border-white/15 px-6 py-3 text-center font-semibold text-white transition hover:border-white/35 hover:bg-white/10"
-                >
-                  Browse Companies
-                </Link>
-              </div>
+        <section className="grid gap-8 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="border-2 border-black bg-white p-5 shadow-[6px_6px_0_#000]">
+            <div className="mb-4 flex items-center justify-between border-b-2 border-black pb-2">
+              <h2 className="text-2xl font-bold">Featured YC Startups</h2>
+              <Link href="/companies?view=yc" className="border-2 border-black px-2 py-1 text-xs font-bold uppercase">
+                View all
+              </Link>
             </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {ycCompanies.slice(0, 4).map((company: Company) => (
+                <div key={company.id} className="border-2 border-black bg-[#f3f4f6] p-4 shadow-[3px_3px_0_#000]">
+                  <Link href="/companies?view=yc" className="block">
+                    <h3 className="text-xl font-bold">{company.name}</h3>
+                    <p className="mt-1 text-xs font-semibold text-neutral-600">@{company.githubOrg}</p>
+                    <p className="mt-3 line-clamp-2 text-sm text-neutral-700">{company.description || 'Open-source startup.'}</p>
+                    <div className="mt-3 flex gap-2 text-xs font-bold">
+                      <span className="border-2 border-black px-2 py-1">{formatNumber(company.stars)} stars</span>
+                      <span className="border-2 border-black px-2 py-1">{company.domain}</span>
+                    </div>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
 
-            <div className="rounded-xl border border-white/10 bg-zinc-950 p-5 shadow-2xl shadow-black/30">
-              <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-4">
-                <span className="text-sm font-medium text-gray-400">Signal quality</span>
-                <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-black">Live</span>
-              </div>
-              <div className="space-y-4">
-                {[
-                  ['Active issues', 'Good first issues and help-wanted labels'],
-                  ['Focused repos', '500-20k stars, enough attention without noise'],
-                  ['Startup domains', 'AI, DevTools, DevOps, Fullstack, Web3'],
-                ].map(([title, copy]) => (
-                  <div key={title} className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
-                    <div className="text-sm font-semibold text-white">{title}</div>
-                    <div className="mt-1 text-sm text-gray-500">{copy}</div>
+          <div className="space-y-5">
+            <div className="border-2 border-black bg-white p-4 shadow-[6px_6px_0_#000]">
+              <h3 className="mb-3 text-xl font-bold">Latest Bounties</h3>
+              <div className="space-y-2">
+                {bounties.map((bounty) => (
+                  <div key={bounty.id} className="border-2 border-black bg-[#f8f9fb] p-3">
+                    <p className="line-clamp-1 text-sm font-bold">{bounty.title}</p>
+                    <p className="text-xs text-neutral-600">{bounty.repo}</p>
+                    <p className="mt-1 text-xs font-bold">{bounty.reward}</p>
                   </div>
                 ))}
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-white/10 bg-zinc-950 px-4 py-16">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-10 flex items-end justify-between gap-4">
-            <div>
-              <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">Domains</p>
-              <h2 className="text-3xl font-bold text-white">Explore by focus area</h2>
+            <div className="border-2 border-black bg-white p-4 shadow-[6px_6px_0_#000]">
+              <h3 className="mb-3 text-xl font-bold">Live Issues</h3>
+              <div className="space-y-2">
+                {issues.slice(0, 4).map((issue: Issue) => (
+                  <a key={issue.id} href={issue.url} target="_blank" rel="noreferrer" className="block border-2 border-black bg-[#f8f9fb] p-3">
+                    <p className="line-clamp-1 text-sm font-bold">{issue.title}</p>
+                    <p className="text-xs text-neutral-600">{issue.repository.fullName}</p>
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3 lg:grid-cols-5">
-            {domains.map((domain) => (
-              <Link
-                key={domain.name}
-                href={`/explore?domain=${domain.name}`}
-                className="group rounded-xl border border-white/10 bg-black p-5 transition hover:-translate-y-0.5 hover:border-white/30 hover:bg-zinc-900"
-              >
-                <div className="mb-5 text-xs font-semibold text-gray-500">{domain.marker}</div>
-                <h3 className="mb-2 text-lg font-bold text-white">{domain.name}</h3>
-                <p className="text-sm leading-6 text-gray-500 group-hover:text-gray-300">{domain.description}</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="px-4 py-16">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-10 flex items-center justify-between gap-4">
-            <h2 className="text-3xl font-bold text-white">Popular Issues</h2>
-            <Link href="/explore" className="font-semibold text-gray-300 transition hover:text-white">
+        <section className="border-2 border-black bg-white p-5 shadow-[6px_6px_0_#000]">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Popular Issues</h2>
+            <Link href="/explore" className="border-2 border-black px-2 py-1 text-xs font-bold uppercase">
               View all
             </Link>
           </div>
-
-          <Suspense fallback={<div className="py-12 text-center text-gray-400">Loading issues...</div>}>
-            {issues.length > 0 ? (
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {issues.map((issue: Issue) => (
-                  <IssueCard key={issue.id} issue={issue} />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-white/10 bg-zinc-950 p-10 text-center text-gray-400">
-                <p className="mb-3 text-xl font-semibold text-white">No issues found yet.</p>
-                <p>Run the sync to populate the database with issues.</p>
-                <code className="mt-5 inline-block rounded-lg border border-white/10 bg-black px-4 py-2 text-gray-300">
-                  POST /api/sync
-                </code>
-              </div>
-            )}
+          <Suspense fallback={<div className="py-8 text-sm text-neutral-500">Loading...</div>}>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {issues.map((issue: Issue) => (
+                <IssueCard key={issue.id} issue={issue} />
+              ))}
+            </div>
           </Suspense>
-        </div>
-      </section>
-
-      <section className="border-y border-white/10 bg-zinc-950 px-4 py-16">
-        <div className="mx-auto max-w-4xl">
-          <h2 className="mb-10 text-center text-3xl font-bold text-white">How It Works</h2>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {[
-              ['01', 'We Discover', 'We scan OSSInsight collections and GitHub for active, under-the-radar startups.'],
-              ['02', 'We Curate', 'We filter for repo size, issue quality, and contributor-friendly signals.'],
-              ['03', 'You Contribute', 'Browse by domain, filter by language, and save promising opportunities.'],
-            ].map(([number, title, copy]) => (
-              <div key={title} className="rounded-xl border border-white/10 bg-black p-5">
-                <div className="mb-4 text-sm font-bold text-gray-500">{number}</div>
-                <h3 className="mb-2 font-bold text-white">{title}</h3>
-                <p className="text-sm leading-6 text-gray-500">{copy}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <footer className="px-4 py-10 text-gray-500">
-        <div className="mx-auto max-w-6xl text-center">
-          <p className="mb-3">
-            <span className="font-bold text-white">OpenContribute</span> built for developers who want to make an impact.
-          </p>
-          <p className="text-sm">Discovering under-the-radar startups across AI, DevTools, DevOps, Fullstack, and Web3.</p>
-        </div>
-      </footer>
-    </div>
+        </section>
+      </div>
+    </AppShell>
   );
 }

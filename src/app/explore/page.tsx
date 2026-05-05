@@ -3,8 +3,8 @@
 import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { IssueCard } from '@/components/IssueCard';
-import { Navbar } from '@/components/Navbar';
 import { FilterSidebar } from '@/components/FilterSidebar';
+import { AppShell } from '@/components/AppShell';
 
 interface Issue {
   id: number;
@@ -83,32 +83,32 @@ function ExploreContent() {
   }, [fetchIssues]);
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <Navbar />
-
-      <div className="mx-auto max-w-7xl px-4 py-8">
-        <div className="flex flex-col gap-8 lg:flex-row">
-          <aside className="lg:w-64 lg:flex-shrink-0">
-            <FilterSidebar
-              domains={domains}
-              languages={languages}
-              selectedDomain={domain}
-              selectedLanguage={language}
-              sort={sort}
-              onDomainChange={(value) => { setDomain(value); setPage(1); }}
-              onLanguageChange={(value) => { setLanguage(value); setPage(1); }}
-              onSortChange={(value) => { setSort(value); setPage(1); }}
-            />
-          </aside>
-
-          <main className="flex-1">
+    <AppShell
+      searchPlaceholder="Search repositories..."
+      leftPanel={(
+        <div className="p-4">
+          <FilterSidebar
+            domains={domains}
+            languages={languages}
+            selectedDomain={domain}
+            selectedLanguage={language}
+            sort={sort}
+            onDomainChange={(value) => { setDomain(value); setPage(1); }}
+            onLanguageChange={(value) => { setLanguage(value); setPage(1); }}
+            onSortChange={(value) => { setSort(value); setPage(1); }}
+          />
+        </div>
+      )}
+    >
+      <div className="mx-auto max-w-6xl">
+        <main className="flex-1 border-2 border-black bg-white p-5 shadow-[6px_6px_0_#000]">
             <div className="mb-6 flex flex-col gap-5 border-b border-white/10 pb-6 md:flex-row md:items-end md:justify-between">
               <div>
-                <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">Issue explorer</p>
-                <h1 className="text-3xl font-bold text-white">
+                <p className="mb-2 text-xs font-bold uppercase tracking-widest text-neutral-500">Issue explorer</p>
+                <h1 className="text-3xl font-bold text-black">
                   {domain ? `${domain} Issues` : 'All Issues'}
                 </h1>
-                <p className="mt-2 text-gray-400">
+                <p className="mt-2 text-neutral-500">
                   {loading ? 'Loading...' : `${issues.length} issues found`}
                 </p>
               </div>
@@ -118,7 +118,7 @@ function ExploreContent() {
                 placeholder="Search issues, repos, or companies..."
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                className="w-full rounded-xl border border-white/10 bg-zinc-950 px-4 py-3 text-white outline-none transition placeholder:text-gray-600 focus:border-white/40 md:max-w-xl"
+                className="w-full border-2 border-black bg-[#f8f9fb] px-4 py-3 text-black outline-none transition placeholder:text-neutral-500 md:max-w-xl"
               />
             </div>
 
@@ -130,7 +130,7 @@ function ExploreContent() {
             )}
 
             {error && (
-              <div className="rounded-xl border border-red-400/20 bg-red-400/10 p-6 text-center">
+              <div className="border-2 border-red-400 bg-red-100 p-6 text-center">
                 <p className="mb-2 text-red-200">Failed to load issues</p>
                 <p className="text-sm text-red-300/70">{error}</p>
               </div>
@@ -148,17 +148,17 @@ function ExploreContent() {
                   <button
                     onClick={() => setPage(Math.max(1, page - 1))}
                     disabled={page === 1}
-                    className="rounded-lg border border-white/10 px-4 py-2 text-gray-300 transition hover:border-white/30 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="border-2 border-black px-4 py-2 text-black transition disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Previous
                   </button>
-                  <span className="text-gray-400">
+                  <span className="text-neutral-600">
                     Page {page} of {totalPages}
                   </span>
                   <button
                     onClick={() => setPage(Math.min(totalPages, page + 1))}
                     disabled={page >= totalPages}
-                    className="rounded-lg border border-white/10 px-4 py-2 text-gray-300 transition hover:border-white/30 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="border-2 border-black px-4 py-2 text-black transition disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     Next
                   </button>
@@ -167,15 +167,14 @@ function ExploreContent() {
             )}
 
             {!loading && !error && issues.length === 0 && (
-              <div className="rounded-xl border border-white/10 bg-zinc-950 p-12 text-center">
-                <p className="mb-3 text-xl font-semibold text-white">No issues found</p>
-                <p className="text-gray-500">Try adjusting your filters or run the sync first.</p>
+              <div className="border-2 border-black bg-[#f8f9fb] p-12 text-center">
+                <p className="mb-3 text-xl font-semibold text-black">No issues found</p>
+                <p className="text-neutral-500">Try adjusting your filters or run the sync first.</p>
               </div>
             )}
-          </main>
-        </div>
+        </main>
       </div>
-    </div>
+    </AppShell>
   );
 }
 

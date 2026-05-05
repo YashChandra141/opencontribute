@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { Navbar } from '@/components/Navbar';
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { AppShell } from '@/components/AppShell';
+import { formatNumber } from '@/lib/format';
 
 interface Company {
   id: number;
@@ -11,6 +14,7 @@ interface Company {
   description: string;
   website: string;
   domain: string;
+  discoverySource: string;
   stars: number;
   forks: number;
   repoCount: number;
@@ -19,7 +23,9 @@ interface Company {
   createdAt: string;
 }
 
-export default function CompaniesPage() {
+function CompaniesContent() {
+  const searchParams = useSearchParams();
+  const isYcView = searchParams.get('view') === 'yc';
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +50,7 @@ export default function CompaniesPage() {
       params.set('page', page.toString());
       params.set('limit', '20');
       if (domain) params.set('domain', domain);
+      if (isYcView) params.set('source', 'YCGitHub');
       params.set('sort', sort);
 
       const response = await fetch(`/api/companies?${params.toString()}`);
@@ -57,7 +64,7 @@ export default function CompaniesPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, domain, sort]);
+  }, [page, domain, sort, isYcView]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -66,27 +73,33 @@ export default function CompaniesPage() {
 
     return () => window.clearTimeout(timer);
   }, [fetchCompanies]);
+  const ycCompanies = companies.filter((company) => company.discoverySource === 'YCGitHub');
+  const visibleCompanies = isYcView ? (ycCompanies.length > 0 ? ycCompanies : companies.slice(0, 8)) : companies;
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <Navbar />
-
-      <div className="mx-auto max-w-6xl px-4 py-8">
+    <AppShell searchPlaceholder="Search companies...">
+      <div className="mx-auto max-w-6xl border-2 border-black bg-white p-6 shadow-[6px_6px_0_#000]">
         <div className="mb-8 border-b border-white/10 pb-6">
-          <p className="mb-2 text-sm font-semibold uppercase tracking-widest text-gray-500">Company directory</p>
-          <h1 className="mb-2 text-3xl font-bold text-white">Under-the-Radar Startups</h1>
-          <p className="max-w-2xl text-gray-400">
-            Discover open-source companies with active communities and meaningful contribution opportunities.
+          <p className="mb-2 text-xs font-bold uppercase tracking-widest text-neutral-500">
+            {isYcView ? 'YC companies' : 'Company directory'}
+          </p>
+          <h1 className="mb-2 text-3xl font-bold text-black">
+            {isYcView ? 'Featured YC Startups' : 'Under-the-Radar Startups'}
+          </h1>
+          <p className="max-w-2xl text-neutral-600">
+            {isYcView
+              ? 'A YC-focused list of open-source startups with active repos and contributor-friendly issues.'
+              : 'Discover open-source companies with active communities and meaningful contribution opportunities.'}
           </p>
         </div>
 
-        <div className="mb-6 flex flex-wrap gap-4 rounded-xl border border-white/10 bg-zinc-950 p-4">
+        <div className="mb-6 flex flex-wrap gap-4 border-2 border-black bg-[#f8f9fb] p-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-300">Domain</label>
+            <label className="mb-1 block text-sm font-medium text-neutral-700">Domain</label>
             <select
               value={domain}
               onChange={(e) => { setDomain(e.target.value); setPage(1); }}
-              className="rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-white outline-none transition focus:border-white/40"
+              className="border-2 border-black bg-white px-3 py-2 text-sm text-black outline-none transition"
             >
               <option value="">All Domains</option>
               {domains.map((d) => (
@@ -96,11 +109,11 @@ export default function CompaniesPage() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-300">Sort By</label>
+            <label className="mb-1 block text-sm font-medium text-neutral-700">Sort By</label>
             <select
               value={sort}
               onChange={(e) => { setSort(e.target.value); setPage(1); }}
-              className="rounded-lg border border-white/10 bg-black px-3 py-2 text-sm text-white outline-none transition focus:border-white/40"
+              className="border-2 border-black bg-white px-3 py-2 text-sm text-black outline-none transition"
             >
               {sortOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -123,32 +136,29 @@ export default function CompaniesPage() {
           </div>
         )}
 
-        {!loading && !error && companies.length > 0 && (
+        {!loading && !error && visibleCompanies.length > 0 && (
           <>
             <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-2">
-              {companies.map((company) => (
-                <div
-                  key={company.id}
-                  className="rounded-xl border border-white/10 bg-zinc-950 p-6 shadow-2xl shadow-black/20 transition hover:-translate-y-0.5 hover:border-white/25 hover:bg-zinc-900"
-                >
+              {visibleCompanies.map((company) => (
+                <div key={company.id} className="border-2 border-black bg-[#f8f9fb] p-6 shadow-[4px_4px_0_#000]">
                   <div className="mb-4 flex items-start justify-between gap-4">
                     <div>
-                      <h3 className="text-xl font-bold text-white">{company.name}</h3>
+                      <h3 className="text-xl font-bold text-black">{company.name}</h3>
                       <a
                         href={`https://github.com/${company.githubOrg}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-gray-500 transition hover:text-white"
+                        className="text-sm text-neutral-500 transition hover:text-black"
                       >
                         @{company.githubOrg}
                       </a>
                     </div>
-                    <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs font-semibold text-gray-200">
+                    <span className="border-2 border-black bg-white px-2.5 py-1 text-xs font-semibold text-black">
                       {company.domain}
                     </span>
                   </div>
 
-                  <p className="mb-4 line-clamp-2 text-gray-400">
+                  <p className="mb-4 line-clamp-2 text-neutral-600">
                     {company.description || 'No description available'}
                   </p>
 
@@ -162,23 +172,23 @@ export default function CompaniesPage() {
 
                   <div className="grid grid-cols-3 gap-4 border-t border-white/10 pt-4 text-center">
                     <div>
-                      <div className="font-bold text-white">{company.stars.toLocaleString()}</div>
-                      <div className="text-xs text-gray-500">Stars</div>
+                      <div className="font-bold text-black">{formatNumber(company.stars)}</div>
+                      <div className="text-xs text-neutral-500">Stars</div>
                     </div>
                     <div>
-                      <div className="font-bold text-white">{company.repoCount}</div>
-                      <div className="text-xs text-gray-500">Repos</div>
+                      <div className="font-bold text-black">{company.repoCount}</div>
+                      <div className="text-xs text-neutral-500">Repos</div>
                     </div>
                     <div>
-                      <div className="font-bold text-white">{company.totalIssues.toLocaleString()}</div>
-                      <div className="text-xs text-gray-500">Open Issues</div>
+                      <div className="font-bold text-black">{formatNumber(company.totalIssues)}</div>
+                      <div className="text-xs text-neutral-500">Open Issues</div>
                     </div>
                   </div>
 
                   <div className="mt-4 flex gap-2">
                     <Link
                       href={`/explore?company=${company.id}`}
-                      className="flex-1 rounded-lg bg-white py-2 text-center text-sm font-semibold text-black transition hover:bg-gray-200"
+                      className="flex-1 border-2 border-black bg-black py-2 text-center text-sm font-semibold text-white transition"
                     >
                       View Issues
                     </Link>
@@ -186,44 +196,64 @@ export default function CompaniesPage() {
                       href={`https://github.com/${company.githubOrg}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-lg border border-white/10 px-4 py-2 text-sm text-gray-300 transition hover:border-white/30 hover:bg-white/10 hover:text-white"
+                      className="border-2 border-black px-4 py-2 text-sm text-black transition"
                     >
                       GitHub
                     </a>
+                    {company.website && (
+                      <a
+                        href={company.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      className="border-2 border-black px-4 py-2 text-sm text-black transition"
+                      >
+                        Website
+                      </a>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="flex items-center justify-center gap-4">
-              <button
-                onClick={() => setPage(Math.max(1, page - 1))}
-                disabled={page === 1}
-                className="rounded-lg border border-white/10 px-4 py-2 text-gray-300 transition hover:border-white/30 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Previous
-              </button>
-              <span className="text-gray-400">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                onClick={() => setPage(Math.min(totalPages, page + 1))}
-                disabled={page >= totalPages}
-                className="rounded-lg border border-white/10 px-4 py-2 text-gray-300 transition hover:border-white/30 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                Next
-              </button>
-            </div>
+            {!isYcView && (
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  onClick={() => setPage(Math.max(1, page - 1))}
+                  disabled={page === 1}
+                className="border-2 border-black px-4 py-2 text-black transition disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <span className="text-neutral-500">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(Math.min(totalPages, page + 1))}
+                  disabled={page >= totalPages}
+                  className="border-2 border-black px-4 py-2 text-black transition disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </>
         )}
 
-        {!loading && !error && companies.length === 0 && (
-          <div className="rounded-xl border border-white/10 bg-zinc-950 p-12 text-center">
-            <p className="mb-3 text-xl font-semibold text-white">No companies found</p>
-            <p className="text-gray-500">Run the sync to populate the database with companies.</p>
+        {!loading && !error && visibleCompanies.length === 0 && (
+          <div className="border-2 border-black bg-[#f8f9fb] p-12 text-center">
+            <p className="mb-3 text-xl font-semibold text-black">No companies found</p>
+            <p className="text-neutral-500">Run the sync to populate the database with companies.</p>
           </div>
         )}
       </div>
-    </div>
+    </AppShell>
+  );
+}
+
+export default function CompaniesPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-black p-8 text-gray-400">Loading...</div>}>
+      <CompaniesContent />
+    </Suspense>
   );
 }
